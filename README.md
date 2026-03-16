@@ -9,6 +9,7 @@ These aren't theoretical. They come from shipping production software where Clau
 | Guide | What it covers |
 |-------|---------------|
 | [AI-native architecture](guides/ai-native-architecture.md) | 9 principles for structuring codebases so LLMs can work in them effectively. Contracts, error handling, idempotency, file structure, and more. |
+| [Claude Code workflows](guides/claude-code-workflows.md) | Practical setup and habits: planning mode, context-mode plugin, /documents/ folder, CLAUDE.md wiring, subagents, task tracking, and workflow orchestration rules. |
 
 ## Related projects
 
