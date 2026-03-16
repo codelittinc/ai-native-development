@@ -10,6 +10,15 @@ These aren't theoretical. They come from shipping production software where Clau
 |-------|---------------|
 | [AI-native architecture](guides/ai-native-architecture.md) | 9 principles for structuring codebases so LLMs can work in them effectively. Contracts, error handling, idempotency, file structure, and more. |
 | [Claude Code workflows](guides/claude-code-workflows.md) | Practical setup and habits: planning mode, context-mode plugin, /documents/ folder, CLAUDE.md wiring, subagents, task tracking, and workflow orchestration rules. |
+| [The AI quality paradox](guides/ai-quality-paradox.md) | Why AI-assisted development needs more QA, not less. The math behind rework spirals, the speed limit on generation velocity, and what to do about it. Based on Mennillo 2026. |
+
+## Skills
+
+Claude Code skills you can install org-wide. Copy the skill folder to `~/.claude/skills/` to use.
+
+| Skill | Command | What it does |
+|-------|---------|-------------|
+| [qa-check](skills/qa-check/) | `/qa-check` | Reviews code changes for rework risk, missing tests, AI-specific defect patterns, and validation gaps. Based on the AI Quality Paradox research. |
 
 ## Related projects
 
