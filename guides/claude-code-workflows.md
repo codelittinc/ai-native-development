@@ -1,6 +1,6 @@
-# Claude Code workflows that actually work
+# Claude Code workflows
 
-This is a collection of setup decisions and habits that have made a real difference in how much I get out of Claude Code. Some are obvious in retrospect. Most I learned by wasting time doing it the other way first.
+Setup decisions and habits that have made a real difference in how much I get out of Claude Code. Some are obvious in retrospect. Most I learned by wasting time doing it the other way first.
 
 ---
 
@@ -30,13 +30,13 @@ This uses an MCP server to load files into context via reference instead of park
 
 ## Build a /documents/ folder
 
-This is probably the single highest-leverage setup task for a new project. Create a `/documents/` directory with these files:
+Create a `/documents/` directory with these files. None of them should be loaded by default -- they're on-demand references that the LLM reads when a task requires them (see the [architecture guide's documentation stack](ai-native-architecture.md#principle-9-structured-documentation-as-system-memory) for the token budget reasoning).
 
 **platform-docs.md** -- Describes every feature of your product in detail. Not marketing copy. Actual descriptions of what each screen does, what each component shows, how the business logic works. You can generate an initial version by having Claude Code go through each file and screen and summarize functionality. Then edit it into something accurate.
 
 **ICPs.md** -- Ideal Customer Profiles. A dossier for each type of user: who they are, what they need, what they can and can't do, what frustrates them. Think private detective report, not marketing persona. This keeps Claude from making UX decisions in a vacuum.
 
-**styleguide.md** -- The visual language of your application. Colors, typography, component hierarchy, spacing, responsive breakpoints. You can generate an initial version from an existing codebase using the `--chrome` flag to let Claude see the running app. Then refine it. Every new UI component should follow this, and the CLAUDE.md should say so.
+**styleguide.md** -- The visual language of your application. Colors, typography, component hierarchy, spacing, responsive breakpoints. You can generate an initial version from an existing codebase using the `--chrome` flag to let Claude see the running app. Then refine it.
 
 **roadmap.md or vision.md** -- Where the product is going. This gives exploratory runs some guardrails. Without it, Claude will build speculative features that don't fit your direction. With it, suggestions tend to align with what you actually want.
 
@@ -44,22 +44,22 @@ This is probably the single highest-leverage setup task for a new project. Creat
 
 ---
 
-## Wire it all together with CLAUDE.md
+## Wire it together with CLAUDE.md
 
-Your CLAUDE.md is the entry point for every session. It should reference all your `/documents/*.md` files and enforce compliance with them. Something like:
+Your CLAUDE.md is the entry point for every session. It should index your `/documents/*.md` files with conditional triggers -- telling the LLM *when* to load each one, not dumping them all up front. This follows the Search over Scan principle: the LLM loads what's relevant to the current task, not everything that exists.
 
 ```markdown
 ## Product documentation
 
-All product documentation lives in `/documents/`. Read these before making changes.
+All product documentation lives in `/documents/`.
 
-| Document | Purpose |
-|----------|---------|
-| platform-docs.md | Every feature described in detail. Read before adding or modifying any feature. |
-| ICPs.md | Who uses this tool. Consult when making UX decisions. |
-| styleguide.md | Colors, typography, layout. All new UI must follow these. |
-| roadmap.md | Product direction. Check before building speculative features. |
-| data-reference.md | Domain model and business rules. Read before any data/API changes. |
+| Document | When to read |
+|----------|-------------|
+| platform-docs.md | Before adding or modifying any feature. |
+| ICPs.md | When making UX decisions or designing user-facing flows. |
+| styleguide.md | When creating or modifying UI components. |
+| roadmap.md | Before building speculative features or suggesting new scope. |
+| data-reference.md | Before any data model, API, or schema changes. |
 
 ### Compliance rules
 - Use colors, fonts, and patterns from styleguide.md. No new colors without updating the guide.
@@ -67,7 +67,7 @@ All product documentation lives in `/documents/`. Read these before making chang
 - Schema or API changes must be reflected in data-reference.md.
 ```
 
-The compliance rules matter. Without them, Claude will read the docs when reminded but won't enforce consistency on its own.
+The compliance rules belong in CLAUDE.md because they're short and always relevant. The docs themselves stay on disk until needed. This way your CLAUDE.md costs ~200 tokens for the index instead of 10K+ tokens loading everything every session.
 
 ---
 
@@ -150,6 +150,6 @@ These three go at the top. They're short and they prevent the most common failur
 
 ## The meta-point
 
-Most of this is just: tell the LLM what you know, in a structured way, before you start working. The context window resets every session. If the knowledge is in your head but not in the files, the LLM is working with incomplete information and you'll spend your time correcting it instead of building.
+The context window resets every session. If the knowledge is in your head but not in the files, the LLM is working with incomplete information and you'll spend your time correcting it instead of building.
 
-Put the knowledge in files. Reference those files from CLAUDE.md. Let the LLM do the rest.
+Put the knowledge in files. Index those files from CLAUDE.md with conditional triggers so the LLM loads what it needs, when it needs it.
