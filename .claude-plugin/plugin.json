@@ -1,0 +1,35 @@
+{
+  "name": "ai-native-development",
+  "owner": {
+    "name": "Codelitt",
+    "email": "opensource@codelitt.com"
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Claude Code skills for AI-native development: quality assurance, supply chain security, and architecture patterns"
+  },
+  "plugins": [
+    {
+      "name": "qa-check",
+      "version": "2.0.0",
+      "description": "Review code changes for AI Quality Paradox violations and AI-native architecture anti-patterns. Flags rework risk, missing test coverage, complexity concerns, and validation gaps. Based on Mennillo 2026 research.",
+      "author": {
+        "name": "Codelitt",
+        "email": "opensource@codelitt.com",
+        "url": "https://github.com/codelittinc"
+      },
+      "source": "./skills/qa-check"
+    },
+    {
+      "name": "supply-chain-check",
+      "version": "1.0.0",
+      "description": "Single-command supply chain security audit. Scans for compromised packages, dangerous version ranges, lock file issues, CVEs, typosquatting, and local IOC artifacts. Wraps npm audit with active threat heuristics.",
+      "author": {
+        "name": "Codelitt",
+        "email": "opensource@codelitt.com",
+        "url": "https://github.com/codelittinc"
+      },
+      "source": "./skills/supply-chain-check"
+    }
+  ]
+}

@@ -14,11 +14,24 @@ These aren't theoretical. They come from shipping production software where Clau
 
 ## Skills
 
-Claude Code skills you can install org-wide. Copy the skill folder to `~/.claude/skills/` to use.
+Claude Code skills you can install as a plugin or copy individually.
+
+### Install as plugin (recommended)
+
+```
+claude plugin install ai-native-development@codelittinc
+```
+
+This installs all skills and keeps them updated.
+
+### Or copy individually
+
+Copy any skill folder to `~/.claude/skills/` to use.
 
 | Skill | Command | What it does |
 |-------|---------|-------------|
 | [qa-check](skills/qa-check/) | `/qa-check` | Reviews code changes for rework risk, missing tests, AI-specific defect patterns, and validation gaps. Based on the AI Quality Paradox research. |
+| [supply-chain-check](skills/supply-chain-check/) | `/supply-chain-check` | Single-command supply chain security audit. Scans for compromised packages, dangerous version ranges, lock file issues, CVEs, typosquatting, and local IOC artifacts. |
 
 ## Related projects
 

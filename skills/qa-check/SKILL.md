@@ -41,6 +41,11 @@ Run `git diff --stat` and `git diff` (or `git diff main...HEAD` if on a branch) 
 - Total lines changed
 - Whether changes span multiple domains (frontend + backend, API + database, etc.)
 
+**Dependency file tripwire:** If any of these files appear in the diff — `package.json`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `requirements.txt`, `Pipfile.lock`, `Gemfile.lock`, `go.sum` — immediately flag:
+> "**Dependency files changed.** Run `/supply-chain-check` before merging to scan for supply chain risks (compromised packages, dangerous version ranges, lock file integrity)."
+
+Continue with the rest of the QA check as normal after flagging.
+
 ### Step 2: Complexity assessment (Quality Paradox)
 
 For each changed file, assess:
