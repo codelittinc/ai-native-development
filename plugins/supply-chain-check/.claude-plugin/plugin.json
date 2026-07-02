@@ -1,0 +1,10 @@
+{
+  "name": "supply-chain-check",
+  "version": "1.1.0",
+  "description": "Single-command supply chain security audit. Scans for compromised packages, dangerous version ranges, lock file issues, CVEs, typosquatting, slopsquatting (hallucinated dependencies), and local IOC artifacts. Wraps npm audit and live advisory sources (OSV.dev, GitHub Advisory Database) with active threat heuristics.",
+  "author": {
+    "name": "Codelitt",
+    "email": "opensource@codelitt.com",
+    "url": "https://github.com/codelittinc"
+  }
+}

@@ -6,7 +6,7 @@ Setup decisions and habits that have made a real difference in how much I get ou
 
 ## Plan before you build
 
-For any non-trivial feature (3+ steps, or anything involving architectural decisions), shift-tab into planning mode before writing code. Add "do deep research on best practices and known issues, using web search" to your prompt. Claude will come back with a structured plan.
+For any non-trivial feature (3+ steps, or anything involving architectural decisions), enter plan mode before writing code (start the session with `--permission-mode plan`, or switch modes in the UI). Add "do deep research on best practices and known issues, using web search" to your prompt. Claude will come back with a structured plan.
 
 Read the plan. Adjust it. Then let it execute.
 
@@ -21,7 +21,7 @@ If something goes sideways mid-build, stop and re-plan. Don't let the LLM keep p
 Install the context-mode plugin:
 
 ```
-/plugin marketplace add mksglu/claude-context-mode
+/plugin marketplace add mksglu/context-mode
 ```
 
 This uses an MCP server to load files into context via reference instead of parking the full file contents in the conversation. The practical effect is a significantly larger effective context window. For any project with more than a handful of files, it's worth the 30 seconds to install.
@@ -145,6 +145,47 @@ These three go at the top. They're short and they prevent the most common failur
 **Find root causes.** No temporary fixes, no bandaids, no "this should work for now." Senior developer standards. If something is broken, find out why and fix the actual problem.
 
 **Minimal impact.** Changes should only touch what's necessary. If the task is to fix a button color, don't also refactor the component's state management.
+
+---
+
+## Automated QA in CI
+
+Review habits only work when someone remembers to run them. To make QA structural instead of voluntary, run `/qa-check` headless on every PR with GitHub Actions and `anthropics/claude-code-action@v1`. (v0.x is deprecated; its `mode`/`direct_prompt`/`max_turns` inputs were replaced by `prompt` and `claude_args` in v1.)
+
+Minimal working example -- `.github/workflows/qa-check.yml`:
+
+```yaml
+name: qa-check
+on:
+  pull_request:
+
+jobs:
+  qa-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so the base..head diff is available
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Run /qa-check against this pull request. Diff the PR branch
+            against origin/${{ github.base_ref }} and review only the
+            changed files. Report findings in the skill's standard format.
+          claude_args: "--allowedTools Read,Grep,Glob,Bash(git:*),Bash(npm view:*)"
+```
+
+Add `ANTHROPIC_API_KEY` as a repository secret. The runner also needs the qa-check skill available: either commit it into the repository (`.claude/skills/qa-check/`) or install the plugin from its marketplace as a setup step before the action runs.
+
+Two operational notes:
+
+- As of June 15, 2026, headless Claude Code (which includes CI runs like this) bills to API credits, not your subscription. Budget for it before turning this on across many repositories.
+- Pilot on one repository first. Tune the prompt and allowed tools until the reports are useful, then roll out org-wide.
 
 ---
 

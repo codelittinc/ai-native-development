@@ -5,14 +5,14 @@
     "email": "opensource@codelitt.com"
   },
   "metadata": {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Claude Code skills for AI-native development: quality assurance, supply chain security, and architecture patterns"
   },
   "plugins": [
     {
       "name": "qa-check",
-      "version": "2.0.0",
-      "description": "Review code changes for AI Quality Paradox violations and AI-native architecture anti-patterns. Flags rework risk, missing test coverage, complexity concerns, and validation gaps. Based on Mennillo 2026 research.",
+      "version": "3.0.0",
+      "description": "Review code changes for AI Quality Paradox violations and AI-native architecture anti-patterns. Complements Claude Code's built-in /code-review: /code-review hunts correctness bugs; qa-check owns AI-specific quality decay and architecture, including rework risk, test integrity (weakened or gamed tests), dependency provenance, spec discipline, validation gaps, and maintainability smells.",
       "author": {
         "name": "Codelitt",
         "email": "opensource@codelitt.com",
@@ -22,8 +22,8 @@
     },
     {
       "name": "supply-chain-check",
-      "version": "1.0.0",
-      "description": "Single-command supply chain security audit. Scans for compromised packages, dangerous version ranges, lock file issues, CVEs, typosquatting, and local IOC artifacts. Wraps npm audit with active threat heuristics.",
+      "version": "1.1.0",
+      "description": "Single-command supply chain security audit. Queries live advisory sources (npm audit, OSV.dev, GitHub Advisory Database) and scans for dangerous version ranges, lock file issues, typosquatting, slopsquatting and hallucinated dependencies, and local IOC artifacts. Wraps npm audit with active threat heuristics.",
       "author": {
         "name": "Codelitt",
         "email": "opensource@codelitt.com",
