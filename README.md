@@ -14,24 +14,39 @@ These aren't theoretical. They come from shipping production software where Clau
 
 ## Skills
 
-Claude Code skills you can install as a plugin or copy individually.
+Claude Code skills you can install as plugins or copy individually.
 
-### Install as plugin (recommended)
+### Install as plugins (recommended)
+
+First add the marketplace. Inside Claude Code:
 
 ```
-claude plugin install ai-native-development@codelittinc
+/plugin marketplace add codelittinc/ai-native-development
 ```
 
-This installs all skills and keeps them updated.
+Or from the CLI:
+
+```
+claude plugin marketplace add codelittinc/ai-native-development
+```
+
+Then install the plugins you want:
+
+```
+claude plugin install qa-check@ai-native-development
+claude plugin install supply-chain-check@ai-native-development
+```
+
+Installed plugins receive updates when new versions are published.
 
 ### Or copy individually
 
-Copy any skill folder to `~/.claude/skills/` to use.
+Copy a skill folder from `plugins/<name>/skills/<name>/` to `~/.claude/skills/` to use it without the plugin system.
 
 | Skill | Command | What it does |
 |-------|---------|-------------|
-| [qa-check](skills/qa-check/) | `/qa-check` | Reviews code changes for rework risk, missing tests, AI-specific defect patterns, and validation gaps. Based on the AI Quality Paradox research. |
-| [supply-chain-check](skills/supply-chain-check/) | `/supply-chain-check` | Single-command supply chain security audit. Scans for compromised packages, dangerous version ranges, lock file issues, CVEs, typosquatting, and local IOC artifacts. |
+| [qa-check](plugins/qa-check/skills/qa-check/) | `/qa-check` | Reviews code changes for rework risk, weakened or missing tests, dependency provenance, missing specs, AI slop, and validation gaps. Complements the built-in /code-review, which hunts correctness bugs. Based on the AI Quality Paradox research. |
+| [supply-chain-check](plugins/supply-chain-check/skills/supply-chain-check/) | `/supply-chain-check` | Single-command supply chain security audit. Queries live advisory sources (npm audit, OSV.dev, GitHub Advisory Database) and scans for dangerous version ranges, lock file issues, typosquatting, slopsquatting, and local IOC artifacts. |
 
 ## Related projects
 
