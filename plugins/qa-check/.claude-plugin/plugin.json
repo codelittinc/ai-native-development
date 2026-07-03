@@ -1,7 +1,7 @@
 {
   "name": "qa-check",
-  "version": "3.0.0",
-  "description": "Review code changes for AI Quality Paradox violations and AI-native architecture anti-patterns. Complements Claude Code's built-in /code-review: /code-review hunts correctness bugs; qa-check owns AI-specific quality decay and architecture — rework risk, test integrity (weakened or gamed tests), dependency provenance, spec discipline, validation gaps, and maintainability smells.",
+  "version": "3.1.0",
+  "description": "Review code changes for AI Quality Paradox violations and AI-native architecture anti-patterns. Complements Claude Code's built-in /code-review: /code-review hunts correctness bugs; qa-check owns AI-specific quality decay and architecture — rework risk, test integrity (weakened or gamed tests), dependency provenance, spec discipline, validation gaps, and maintainability smells. Ships a deterministic push gate (PreToolUse hook, no LLM calls): repos with a .qa-check-required file block git push until /qa-check has run.",
   "author": {
     "name": "Codelitt",
     "email": "opensource@codelitt.com",
