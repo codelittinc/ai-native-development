@@ -1,6 +1,6 @@
 ---
 name: qa-check
-version: 3.0.0
+version: 3.1.0
 description: |
   Review code changes for AI Quality Paradox violations and AI-native
   architecture anti-patterns. Complements Claude Code's built-in /code-review:
@@ -243,6 +243,12 @@ Produce a structured report:
 
 ### Recommended actions
 1. [Specific, actionable items to address before merging]
+```
+
+**After producing the report**, record that the check ran (this unblocks the push gate in repos with a `.qa-check-required` file):
+
+```bash
+printf '%s\n%s\n' "$(git rev-parse HEAD)" "$(date +%s)" > "$(git rev-parse --git-dir)/qa-check-ok"
 ```
 
 ### Risk level criteria

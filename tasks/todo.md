@@ -30,11 +30,14 @@ Based on: repo audit + research sweep of Feb–Jul 2026 AI code-quality literatu
 - [x] Description repositioned as complement to built-in `/code-review`.
 - [x] qa-check bumped to 3.0.0 (marketplace.json + plugin.json + frontmatter, verified matching).
 
-## Phase 3 — Enforcement
+## Phase 3 — Enforcement (revised 2026-07-03: subscription-only, no API credits)
 
-- [x] CI recipe documented in guides/claude-code-workflows.md: `anthropics/claude-code-action@v1` (prompt + claude_args), fetch-depth 0, API-credit billing note, pilot-one-repo recommendation.
-- [ ] Actually enable the GitHub Action on one active repo as pilot (pick repo — Cody's call).
-- [ ] Optional: Stop-hook or pre-push hook reminding to run qa-check before PR.
+The original claude-code-action CI recipe was rejected — headless Claude bills API credits (June 15, 2026 change) and this team runs on subscription. Replaced with in-session + LLM-free enforcement (qa-check 3.1.0):
+
+- [x] Push gate ships with the qa-check plugin: PreToolUse hook (`hooks/qa-gate.sh`, deterministic, zero LLM calls) blocks `git push` in opted-in repos until /qa-check ran against HEAD (or <30 min ago). Opt-in: `.qa-check-required` at repo root. Override: `QA_CHECK_SKIP=1 git push`. Skill writes marker to `$(git rev-parse --git-dir)/qa-check-ok` in Step 9.
+- [x] Guide section rewritten: "Automated QA without API costs" — push gate + free grep-level CI check that the PR body contains the QA Check Report + deterministic gates. claude-code-action kept only as a priced warning for API-billed orgs.
+- [ ] Drop `.qa-check-required` into the repos that should be gated (Cody picks which).
+- [ ] Add the free qa-report-present workflow to those repos' CI.
 
 ## Review (2026-07-02)
 

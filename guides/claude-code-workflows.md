@@ -148,44 +148,45 @@ These three go at the top. They're short and they prevent the most common failur
 
 ---
 
-## Automated QA in CI
+## Automated QA without API costs
 
-Review habits only work when someone remembers to run them. To make QA structural instead of voluntary, run `/qa-check` headless on every PR with GitHub Actions and `anthropics/claude-code-action@v1`. (v0.x is deprecated; its `mode`/`direct_prompt`/`max_turns` inputs were replaced by `prompt` and `claude_args` in v1.)
+Review habits only work when someone remembers to run them. But do NOT reach for headless Claude in CI to fix that: as of June 15, 2026, headless Claude Code (including `anthropics/claude-code-action`) bills to API credits, not your subscription. If your team works on subscription billing, the interactive session is the only surface where Claude runs at no marginal cost — so enforcement belongs in the session, and CI should stay LLM-free.
 
-Minimal working example -- `.github/workflows/qa-check.yml`:
+The stack, in order of value:
+
+**1. The push gate (ships with the qa-check plugin).** Installing the qa-check plugin installs a PreToolUse hook that intercepts `git push` from any Claude Code session. In repos that opt in, the push is blocked until `/qa-check` has run against the current HEAD (or within the last 30 minutes — covering the normal check → fix → commit → push flow). The gate is a deterministic shell script: zero model calls, zero API cost.
+
+- Opt a repo in: `touch .qa-check-required` at the repo root (commit it).
+- `/qa-check` writes the freshness marker (`.git/qa-check-ok`) automatically when it completes.
+- Deliberate override, one push: `QA_CHECK_SKIP=1 git push`.
+
+Because the whole team writes code through Claude Code, gating the session's `git push` IS gating the PR — at the moment the work happens, on subscription, instead of after the fact on API credits.
+
+**2. A free CI check that the QA report made it to the PR.** No LLM — just verify the PR description contains the report the author's session already produced. `.github/workflows/qa-report-check.yml`:
 
 ```yaml
-name: qa-check
+name: qa-report-present
 on:
   pull_request:
+    types: [opened, edited, synchronize]
 
 jobs:
-  qa-check:
+  check:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # full history so the base..head diff is available
-
-      - uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: |
-            Run /qa-check against this pull request. Diff the PR branch
-            against origin/${{ github.base_ref }} and review only the
-            changed files. Report findings in the skill's standard format.
-          claude_args: "--allowedTools Read,Grep,Glob,Bash(git:*),Bash(npm view:*)"
+      - name: Require QA Check Report in PR body
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if ! grep -q "## QA Check Report" <<< "$BODY"; then
+            echo "::error::PR description is missing the QA Check Report. Run /qa-check and paste the report."
+            exit 1
+          fi
 ```
 
-Add `ANTHROPIC_API_KEY` as a repository secret. The runner also needs the qa-check skill available: either commit it into the repository (`.claude/skills/qa-check/`) or install the plugin from its marketplace as a setup step before the action runs.
+**3. Deterministic gates in CI.** Linters, type checks, tests, coverage diffs — these were always LLM-free and they stay in CI. qa-check complements them; it never replaces them.
 
-Two operational notes:
-
-- As of June 15, 2026, headless Claude Code (which includes CI runs like this) bills to API credits, not your subscription. Budget for it before turning this on across many repositories.
-- Pilot on one repository first. Tune the prompt and allowed tools until the reports are useful, then roll out org-wide.
+If your organization bills through the API anyway (no subscription seats), running `/qa-check` headless on PRs via `claude-code-action@v1` works — but price it first; per-PR LLM review across an active org adds up quickly. For subscription teams the push gate above gives the same enforcement for free.
 
 ---
 
