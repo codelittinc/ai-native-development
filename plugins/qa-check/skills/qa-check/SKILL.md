@@ -306,7 +306,7 @@ Therefore, look for validation differences and error handling differences betwee
 
 - Find out if the new code validates its inputs in the same way as the module around it. Report code that trusts its callers where the adjacent code does not. Also report defensive checks that the conventions put at the boundary instead.
 - Find out if the new code handles errors in the style of the codebase. Look for the same error types, the same propagation direction, and the same log contract. Report a second convention next to the first one.
-- Ask this question: are there now two answers to "what happens with bad input here?" Two conventions degrade the next session, because the agent must guess which one applies.
+- Ask this question: are there now two answers to "what happens with bad input here?" Two conventions degrade the next session. The agent must guess which one applies.
 - Find out if the change is larger than the task needs. Extra downstream code size is an independent predictor of failure.
 
 **Report two validation conventions or two error handling conventions in one module as HIGH.** Say which convention you think is the correct one.
