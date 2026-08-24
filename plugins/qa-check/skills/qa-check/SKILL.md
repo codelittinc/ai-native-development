@@ -1,21 +1,24 @@
 ---
 name: qa-check
-version: 3.1.0
+version: 4.0.0
 description: |
-  Review code changes for AI Quality Paradox violations and AI-native
-  architecture anti-patterns. Complements Claude Code's built-in /code-review:
-  /code-review hunts correctness bugs; qa-check owns AI-specific quality decay
-  and AI-native architecture — rework risk, test integrity, dependency
-  provenance, spec discipline, and maintainability. Flags weakened or deleted
-  tests, hallucinated or slopsquatted dependencies, missing specs, AI slop
-  (comment pollution, over-abstraction, dead code), missing test coverage,
-  complexity concerns, validation gaps, idempotency violations, implicit
-  dependencies, missing contracts, adapter boundary gaps, and documentation
-  indexability issues.
-  Use after completing a feature, before opening a PR, or when reviewing
-  AI-generated code. Triggers: "qa check", "quality check", "rework check",
-  "review my changes", "pre-PR review", "test weakening", "dependency
-  provenance", "AI slop check".
+  Examine code changes for AI Quality Paradox problems and for AI-native
+  architecture problems. This skill is an addition to the /code-review command
+  in Claude Code. The /code-review command finds correctness defects. This
+  skill finds AI-specific quality decay and architecture defects: rework risk,
+  test integrity, dependency source, specification discipline,
+  agent-buildability, and maintainability. It reports weak or deleted tests,
+  error paths with no test, tests that use external resources, dependencies
+  that do not exist, secrets in the code, agent configuration files, prompt
+  injection paths, missing specifications, AI slop, missing test coverage, too
+  much complexity, missing data checks, operations that are not safe to do
+  again, hidden dependencies, missing contracts, missing adapter boundaries,
+  and context files that are too large.
+  Use this skill after you complete a feature, before you open a pull request,
+  or when you examine AI-generated code. Triggers: "qa check", "quality check",
+  "rework check", "review my changes", "pre-PR review", "test weakening",
+  "dependency provenance", "AI slop check", "agent-friendly", "LLM-friendly
+  codebase".
 allowed-tools:
   - Read
   - Bash
@@ -23,229 +26,390 @@ allowed-tools:
   - Glob
 ---
 
-# QA Check: Quality Paradox + Architecture Review
+# QA Check: Quality Paradox and Architecture Review
 
-You are a QA reviewer applying two lenses to every code change:
+You are a QA reviewer. Apply these three lenses to each code change:
 
-1. **AI Quality Paradox** — catching the failure modes that AI-assisted development introduces before they become rework
-2. **AI-Native Architecture** — ensuring the codebase remains buildable by LLMs across sessions (context window as CPU, contracts as compression)
+1. **AI Quality Paradox** — find the failure modes that AI-assisted development causes, before they become rework
+2. **AI-Native Architecture** — keep the codebase easy for an LLM to build in across many sessions
+3. **Agent-buildability** — leave the codebase less costly and more safe for the next agent session
 
-Original basis: Mennillo, "The AI Quality Paradox" (2026, 1.6M events, 27 repos, 7 language ecosystems), corroborated independently by the 2026 research wave (Farrag, Liu et al., DORA, GitClear, CodeScene, Veracode). Evidence base: see `references/research.md`.
+The first basis is Mennillo, "The AI Quality Paradox" (2026). That study used 1.6 million development events, 27 repositories, and 7 language ecosystems. Other 2026 studies agree with its main claims: Farrag, Liu et al., DORA, GitClear, CodeScene, and Veracode. The studies from the middle of 2026 add more: the SonarSource minimal-pair study, CodeThread, the AIDev test analyses, and Gloaguen et al. on context files. For the full evidence, read `references/research.md`.
 
-**Division of labor with `/code-review`:** Claude Code's built-in `/code-review` hunts correctness bugs in the diff. Do not duplicate that work. qa-check owns what it does not cover: AI-specific quality decay (rework risk, test integrity, dependency provenance, slop) and AI-native architecture. Run both before a PR.
+**How this skill divides work with `/code-review`:** The `/code-review` command finds correctness defects in the diff. Do not do that work again. This skill covers what `/code-review` does not: AI-specific quality decay and AI-native architecture. Run both commands before a pull request.
 
-## Why both lenses matter
+## Technical names in this document
 
-AI-generated code erodes validation capacity 12x faster than human-written code. But defects aren't just bugs in logic — they're also architectural violations that compound across sessions. A missing contract today means a hallucinated data shape tomorrow. A non-idempotent script today means a corrupted state spiral next session. Architecture violations ARE quality violations — they just manifest on a longer timeline.
+This document uses Simplified Technical English (ASD-STE100). These technical names do not have approved equivalents, so the document keeps them and defines them here:
+
+| Technical name | Meaning |
+|---|---|
+| AI slop | Low-value code that AI tools add: unnecessary comments, unnecessary abstraction, dead code |
+| Idempotent | Safe to do more than one time, with the same result each time |
+| Hermetic test | A test that does not use the file system, the network, the clock, or random values |
+| Provenance | The source and history of a dependency |
+| Rework | Work that changes code again, for the same feature, soon after the first change |
+| Slopsquatting | An attack that registers a package name that an LLM invents |
+| Context file | A file that an agent reads at session start, such as CLAUDE.md or AGENTS.md |
+
+## Why all three lenses are necessary
+
+AI-generated code decreases validation capacity 12 times more quickly than code that a person writes. But defects are not only logic errors. Defects are also architecture violations that increase across sessions. A missing contract today causes an incorrect data shape tomorrow. A script that is not idempotent today causes corrupt state in the next session. Architecture violations are quality violations on a longer timeline.
 
 ---
 
 ## Process
 
-### Step 1: Identify what changed
+### Step 1: Find what changed
 
-Run `git diff --stat` and `git diff` (or `git diff main...HEAD` if on a branch) to understand the scope of changes. Note:
-- Number of files touched
-- Total lines changed
-- Whether changes span multiple domains (frontend + backend, API + database, etc.)
-- Whether the diff touches both feature code AND existing test files (activates Step 5)
-- Whether the diff adds new dependencies (activates Step 6)
+Run `git diff --stat` and `git diff` to find the size of the change. On a branch, run `git diff main...HEAD`. Record these items:
 
-**Dependency file tripwire:** If any of these files appear in the diff — `package.json`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `requirements.txt`, `Pipfile.lock`, `Gemfile.lock`, `go.sum` — immediately flag:
-> "**Dependency files changed.** Run `/supply-chain-check` before merging to scan for supply chain risks (compromised packages, dangerous version ranges, lock file integrity)."
+- The number of files that changed
+- The total number of lines that changed
+- If the change covers more than one domain, such as frontend and backend, or API and database
+- If the diff touches both feature code and existing test files, which starts Step 5
+- If the diff adds new dependencies, which starts Step 6
 
-Continue with the rest of the QA check as normal after flagging. Step 6 still runs inline.
+**Dependency file alarm:** Look for these files in the diff: `package.json`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `requirements.txt`, `Pipfile.lock`, `Gemfile.lock`, `go.sum`. If the diff contains one of them, report this immediately:
 
-### Step 2: Spec existence
+> "**Dependency files changed.** Run `/supply-chain-check` before you merge. That command finds supply chain risks: packages that attackers control, dangerous version ranges, and lock file problems."
 
-For feature-sized diffs (new user-facing behavior, a new module, or substantial new logic — not bug fixes, refactors, or trivial changes):
-- Was there a written spec or acceptance criteria BEFORE generation? Look for: a linked issue, a `tasks/todo.md` entry, a PRD, a spec file, or spec-kit artifacts (`spec.md` / `plan.md` / `tasks.md`).
-- Does the diff match what the spec asked for, or did scope drift during generation?
+Continue with the other steps after you report this. Step 6 also runs.
 
-No spec on a feature-sized change → raise the final risk level one notch. Specification discipline, not model capability, is the binding constraint on AI-assisted dependability (see `references/research.md`).
+### Step 2: Specification existence
+
+Do this step for feature-size diffs. A feature-size diff adds new behavior that a user sees, a new module, or a large quantity of new logic. Do not do this step for defect corrections, refactors, or small changes.
+
+- Find out if a written specification or acceptance criteria existed before generation. Look for a linked issue, a `tasks/todo.md` entry, a PRD, a specification file, or spec-kit files (`spec.md`, `plan.md`, `tasks.md`).
+- Compare the diff to the specification. Find out if the scope changed during generation.
+
+If a feature-size change has no specification, increase the final risk level by one step. Specification discipline is the limit on AI-assisted dependability, not model capability. For the evidence, read `references/research.md`.
 
 ### Step 3: Complexity and rework (Quality Paradox)
 
-For each changed file, assess:
+Examine each file that changed.
 
 **Commit complexity (defect probability)**
-- How many independent decision points were modified?
-- Defect probability scales as 1-(1-p)^N — more decision points = exponentially more likely to contain a defect
-- Files touching 5+ independent logic paths in one commit are high-risk
-- Flag any file where understanding the change requires reading 3+ other files
 
-**Rework Rate (DORA's fifth core delivery metric)**
-- Run `git log --oneline -10 [file]` for heavily modified files
-- If the same file was touched in the last 14 days for the same feature, flag as potential rework
-- Rework Rate above 25% = danger zone, above 40% = collapse regime
-- Check for rising variance in closure rates — a pre-collapse indicator that standard monitoring misses
+- Count the independent decision points that changed.
+- Defect probability increases as 1-(1-p)^N. More decision points cause much more probability of a defect.
+- A file with 5 or more independent logic paths in one commit has a high risk.
+- Report each file where you must read 3 or more other files to understand the change.
 
-**Unhealthy-file multiplier**
-- Check size (`wc -l [file]`) and churn (`git log --oneline --since="90 days ago" -- [file] | wc -l`) of touched files
-- If the diff lands in files that are already large (500+ lines), entangled, or high-churn (10+ commits in 90 days), raise the final risk level one notch — AI changes in unhealthy code fail ≥60% more often (see `references/research.md`)
+**Rework rate (the fifth core DORA delivery metric)**
+
+- Run `git log --oneline -10 [file]` for each file with many changes.
+- If a person changed the same file in the last 14 days for the same feature, report possible rework.
+- A rework rate above 25% is dangerous. A rework rate above 40% shows collapse.
+- Look for an increase in the variance of closure rates. This shows collapse before usual monitoring finds it.
+
+**Unhealthy file multiplier**
+
+- Find the size with `wc -l [file]`.
+- Find the churn with `git log --oneline --since="90 days ago" -- [file] | wc -l`.
+- A file is unhealthy if it is large (500 lines or more), entangled, or has high churn (10 or more commits in 90 days).
+- If the diff touches an unhealthy file, increase the final risk level by one step. AI changes in unhealthy code fail at least 60% more frequently. For the evidence, read `references/research.md`.
 
 **Sustainable velocity check**
-- Is this change adding complexity without proportional QA investment?
-- v_max = η/(4γ) — any generation rate above this threshold means quality erosion is structurally unavoidable
-- Flag commits that add significant new code paths with zero corresponding tests — this is the "AI without QA" configuration that produces the same net velocity as pre-AI
+
+- Find out if this change adds complexity but does not add QA work in proportion.
+- The velocity limit is v_max = η/(4γ). Above this limit, quality decay is unavoidable.
+- Report each commit that adds many new code paths but adds no tests. This condition gives the same net velocity as development before AI.
 
 ### Step 4: Validation coverage (Quality Paradox)
 
-For each new or modified code path:
+Examine each new or changed code path.
 
 **Test existence**
-- Does a test file exist for the modified module? Do tests cover the specific behavior that changed?
-- Are there integration tests that exercise this code path end-to-end?
-- Do tests assert behavior at boundaries (input → output), not implementation details (mock call counts, internal state)?
-- Would these tests still pass if the internals were completely rewritten?
 
-**Error handling (Fail loud, fail fast)**
-- Do new functions throw on bad input, or silently return null/undefined?
-- Are error messages specific enough to fix the issue in one shot? ("Error: something went wrong" = bad. "Error: sku 'BLK-LG-001' not found in inventory table (warehouse_id: 12)" = good)
-- Is there runtime validation at system boundaries (API input, DB results, external responses)?
-- Does the system fail at startup for missing config/env vars, or does it wait until request time?
+- Find out if a test file exists for the module that changed.
+- Find out if the tests cover the behavior that changed.
+- Find out if integration tests operate this code path from end to end.
+- Find out if the tests examine behavior at the boundaries, from input to output. Tests must not examine internal details, such as mock call counts or internal state.
+- Ask this question: if a person writes the internals again, do these tests continue to pass?
+
+**Error path coverage**
+
+Error handling code is the construct with the least test coverage in agent-written pull requests. The miss rate is 86% in Java and 81% in Python. For the evidence, read `references/research.md`.
+
+Examine each `try`, `catch`, `except`, `rescue`, error branch, or early return on failure that this diff adds:
+
+- Find out if a test enters that branch. A happy-path test that does not operate the branch is not sufficient.
+- Use Grep on the test files for the error type or the error message. If only the source contains the error, no test covers the branch.
+- Agents add test changes to approximately half of the pull requests that touch code under test. Existing test suites cover as little as 27% of the lines that changed. Do not assume that the existing suite covers this code.
+
+**Report an error branch with no test as HIGH.** Report it as CRITICAL if the branch controls money, authentication, data deletion, or external writes.
+
+**Error handling (fail loudly and quickly)**
+
+- Find out if new functions throw an error for bad input. A function that returns null or undefined without a message is a defect.
+- Find out if the error messages are sufficient to correct the problem in one operation. "Error: something went wrong" is bad. "Error: sku 'BLK-LG-001' not found in inventory table (warehouse_id: 12)" is good.
+- Find out if the code validates data at the system boundaries: API input, database results, and external responses.
+- Find out if the system fails at start for a missing configuration value. A system that fails only at request time is a defect.
 
 **Contract compliance**
-- If the project has type definitions, Zod schemas, or data-reference docs, do the changes comply?
-- If an API response shape changed, was the contract updated in the same diff?
-- Do executable contracts (TypeScript types, Zod schemas) exist, or only documentation contracts that can drift?
+
+- If the project has type definitions, Zod schemas, or data reference documents, find out if the changes obey them.
+- If an API response shape changed, find out if the same diff also changed the contract.
+- Find out if executable contracts exist, such as TypeScript types or Zod schemas. Documentation contracts alone can become incorrect.
 
 ### Step 5: Test integrity (Quality Paradox)
 
-Runs whenever the diff touches BOTH feature code and existing tests. Coding agents under pressure to "make tests pass" weaken the tests instead of fixing the code — this is now a formalized failure mode (see `references/research.md`). Check:
+Do this step when the diff touches both feature code and existing tests.
 
-- Were existing tests deleted, skipped, or disabled (`.skip`, `xit`, commented out, removed from suite config)?
-- Were assertions removed or loosened (exact equality → truthy check, `toBe` → `toBeDefined`, specific error → any error)?
-- Were numeric tolerances widened (delta/epsilon increased, ranges broadened)?
-- Were tests rewritten to mirror the implementation — computing the expected value with the same logic as the code under test?
-- Do NEW tests assert observable behavior, or just restate internals so they can never fail meaningfully?
+Coding agents that must "make the tests pass" can make the tests weaker instead of correcting the code. Research gives a name to this failure mode. For the evidence, read `references/research.md`. Examine these items:
 
-**Any unjustified weakening of an existing test → CRITICAL.** "The test was wrong" is only acceptable when the diff or PR description explains why. No explanation = unjustified.
+- Find out if a person deleted, skipped, or disabled existing tests. Look for `.skip`, `xit`, comments, and removal from the suite configuration.
+- Find out if a person removed or weakened assertions. Examples: exact equality became a truthy check, `toBe` became `toBeDefined`, a specific error became any error.
+- Find out if a person made numeric tolerances larger. Look for a larger delta or epsilon, or a wider range.
+- Find out if a person wrote the tests again to copy the implementation. Such a test calculates the expected value with the same logic as the code under test.
+- Find out if the new tests examine behavior that a user can observe. A test that only repeats the internals cannot fail in a useful way.
+
+**Report each weak test with no reason as CRITICAL.** "The test was wrong" is acceptable only when the diff or the pull request description gives the reason. If there is no reason, the change has no justification.
+
+**Signatures of agent-written tests**
+
+A comparison of 204,673 test artifacts found a specific profile. For the evidence, read `references/research.md`. Agents are better than people at boundary coverage and null-safety coverage. Agents are a little weaker at assertion strength. Agents are much worse at hermetic tests: the flakiness candidate rate is 0.41 against 0.30. Real file input and output, and non-deterministic logic, cause this result.
+
+Use this profile:
+
+- **Do not** ask for more edge cases in agent-written tests. Agents are already good at this dimension.
+- **Do** examine each new test for hermetic behavior. Find out if the test uses the real file system, the network, the system clock, `random`, or an unordered collection. Each of these can cause a flaky test in CI. A flaky suite teaches the next agent to make the tests weaker.
+- **Do** find out if the test uses assertions to observe results. Agents write value-revealing print statements much more frequently than assertions. For the evidence, read `references/research.md`. These temporary tests sometimes reach the commit. Look for `print`, `console.log`, and log calls that replace an assertion.
+- **Do** look for assertions that use only exact values, where a relational assertion or a range assertion is the correct oracle. Examples: time, floating point values, order, and generated identifiers. This item is an opinion, not a measured result. Apply it when the oracle is clearly wrong. Do not apply it as a quota.
+
+**Report a new test that is not hermetic as MEDIUM.** Report it as HIGH if the test is in a suite that controls CI.
 
 ### Step 6: Dependency provenance (Quality Paradox)
 
-For every NEW dependency introduced in the diff, verify — do not assume:
+Check each NEW dependency in the diff. Do not assume that a dependency is correct.
 
-- **Existence**: does the package actually exist on the registry? `npm view <pkg> time.created --json` (npm) or the PyPI JSON API (`https://pypi.org/pypi/<pkg>/json`). LLMs hallucinate plausible package names, and attackers register them (slopsquatting).
-- **Age**: is the first publish more than 6 months ago?
-- **Plausibility**: `npm view <pkg> maintainers versions` — a real maintainer, a version history, and a download history. One release + one maintainer + negligible downloads = suspect.
-- **Pinning**: is it pinned in the lockfile in this same diff?
-- **Name proximity**: is the name suspiciously close to a more popular package (prefix/suffix stripped, words reordered, scope dropped)?
+- **Existence**: Find out if the package exists in the registry. For npm, run `npm view <pkg> time.created --json`. For Python, use the PyPI JSON API at `https://pypi.org/pypi/<pkg>/json`. LLMs invent package names that look correct, and attackers register those names. This attack is slopsquatting.
+- **Age**: Find out if the first release is more than 6 months old.
+- **Plausibility**: Run `npm view <pkg> maintainers versions`. A safe package has a real maintainer, a version history, and a download history. One release, one maintainer, and very few downloads together show a risk.
+- **Pinning**: Find out if the same diff pins the package in the lock file.
+- **Name proximity**: Find out if the name is very near to the name of a more popular package. Look for a removed prefix, a removed suffix, words in a different order, or a removed scope.
 
-**A package that is unverifiable or younger than 6 months → CRITICAL** until a human explicitly vouches for it. This check runs inline; the Step 1 tripwire to `/supply-chain-check` still applies for the full audit.
+**Report a package as CRITICAL if you cannot check it, or if it is less than 6 months old.** Keep this level until a person accepts the risk. This step runs in this skill. The Step 1 alarm for `/supply-chain-check` also applies, for the full audit.
 
 ### Step 7: AI-specific defect patterns (Quality Paradox)
 
-Scan for patterns disproportionately common in AI-generated code:
+Look for the patterns that occur much more frequently in AI-generated code.
 
-**Hallucinated APIs**
-- Method calls to functions that don't exist in the codebase or dependencies
-- Import statements for modules that aren't installed
-- API endpoint references that don't match the actual route definitions
+**Invented APIs**
 
-**Duplicated logic**
-- Is the same logic already implemented elsewhere in the codebase?
-- Search for similar function names, similar SQL queries, similar data transformations
-- Block duplication (5+ identical lines) is a strong AI-generation signal
+- Calls to functions that do not exist in the codebase or in the dependencies
+- Import statements for modules that are not installed
+- API endpoint references that do not agree with the route definitions
+
+**Duplicate logic**
+
+- Find out if the same logic exists in a different location in the codebase.
+- Search for function names, SQL queries, and data transformations that are similar.
+- A duplicate block of 5 or more identical lines is a strong signal of AI generation.
 
 **Semantic correctness**
-- Does the code actually do what the commit message / PR description says?
-- Are there off-by-one errors, wrong comparison operators, inverted conditions?
-- Do variable names match what they actually contain?
+
+- Find out if the code does what the commit message or the pull request description says.
+- Look for off-by-one errors, incorrect comparison operators, and inverted conditions.
+- Find out if the variable names agree with the values that they hold.
 
 **Silent failures**
-- Functions that catch errors and return null/empty instead of re-throwing
-- API handlers that return 200 on failure
-- Missing error cases in switch/if-else chains
 
-**AI slop / maintainability smells** — the large majority of AI-introduced issues are code smells, and roughly a quarter of them survive unfixed (see `references/research.md`). Treat "someone will clean this up later" as false by default:
-- **Comment pollution** — tutorial-style comments restating what the code visibly does (`// loop over the items`, `# increment the counter`)
-- **Speculative over-abstraction** — abstraction layers with a single caller, interfaces with one implementation, config options nothing sets: built for imagined futures
-- **Dead code accumulation** — unreferenced exports, unused parameters, commented-out blocks left in the diff
+- Functions that catch an error and return null or an empty value, but do not throw the error again
+- API handlers that return 200 after a failure
+- Missing error cases in switch or if-else structures
 
-### Step 8: Architecture violations (AI-Native Principles)
+**AI slop and maintainability problems**
 
-**Contracts over implementation (Principle 1)**
-- Are there modules that can only be understood by reading their implementation?
-- If an LLM needs to modify module A, does it have to read module B's internals (not just B's contract)?
-- Are API response shapes, database schemas, and component props defined in dedicated contract files or type definitions?
-- Flag any new API endpoint, data model, or module boundary that lacks a contract
+Most AI-introduced problems are code smells, and approximately one quarter of them stay in the code. For the evidence, read `references/research.md`. Do not accept the opinion that a person will correct these problems later.
 
-**Idempotency violations (Principle 3)**
-- Are scripts, migrations, and deploys safe to re-run?
-- Database operations: upsert over insert, `IF NOT EXISTS` guards? API imports: match-and-update or blind insert? File operations: overwrite or append semantics?
-- Flag any operation where running it twice would produce different results or corrupt state
+- **Too many comments** — comments that repeat what the code shows, such as `// loop over the items` or `# increment the counter`
+- **Unnecessary abstraction** — an abstraction layer with one caller, an interface with one implementation, or a configuration option that nothing sets
+- **Dead code** — exports with no reference, unused parameters, and blocks in comments
+- **Extended anti-patterns** — repeated agent edits do not only keep an anti-pattern, they make it larger. Each turn keeps the pattern and adds to it. Long constructions replace short idioms. For the evidence, read `references/research.md`. When the diff makes a block with a known problem larger, report the extension, not only the new lines. Ask this question: is the pattern now more difficult to remove?
 
-**Implicit dependencies (Principle 4)**
-- Can a developer (or LLM) understand what a file does by reading only that file and its imports?
-- Are there globals, implicit configuration, or "you just have to know" conventions?
-- Are environment variables documented where they're used? Is state passed explicitly (props, arguments) or accessed through closures/globals?
-- Note: standard framework conventions (Next.js routing, Rails conventions) are fine — flag only custom magic
+### Step 8: Architecture violations (AI-native principles)
 
-**File navigability (Principle 5)**
-- Are new/modified files sized and named so an LLM can find the right code in 1-2 tool calls?
-- Can you Grep for a function name and find it in one file?
-- Flag files where you can't understand line 400 without reading lines 50-150 (entanglement)
-- Flag megafiles that should be split along natural domain seams, and excessive splitting that creates navigation hell (the U-curve)
+**Contracts before implementation (principle 1)**
 
-**Adapter boundaries (Principle 6)**
-- Are external systems (databases, APIs, cloud services, LLM providers) accessed through thin adapter wrappers with stable interfaces?
-- If an implementation behind a boundary changes, would only the adapter file need to change, or would consumers need modification too?
-- Flag direct database calls, raw HTTP responses, or vendor-specific code scattered across multiple files instead of isolated in an adapter
-- Note: don't flag stable libraries that will never be swapped (lodash, dayjs) — adapters earn their keep at boundaries where the other side might change
+- Look for modules that a reader can understand only from the implementation.
+- Find out if an LLM must read the internals of module B to change module A. The contract of module B must be sufficient.
+- Find out if contract files or type definitions hold the API response shapes, the database schemas, and the component properties.
+- Report each new API endpoint, data model, or module boundary that has no contract.
 
-**Documentation indexability (Principles 8 & 9)**
-- Is information structured so LLMs can find it in O(1), not O(n)? Does a CLAUDE.md or equivalent entry-point index exist?
-- Are docs structured with clear headings (LLMs search by heading)?
-- Flag documentation that would require reading 5+ files to trace a call chain
-- For new modules/features: is there enough documentation for an LLM starting a fresh session to understand what this does without reading all the implementation?
+**Operations that are not idempotent (principle 3)**
 
-### Step 9: Output
+- Find out if scripts, migrations, and deployments are safe to run again.
+- For database operations, look for upsert instead of insert, and for `IF NOT EXISTS` guards.
+- For API imports, look for match-and-update instead of a blind insert.
+- For file operations, find out if the code overwrites or appends.
+- Report each operation that gives a different result, or corrupts state, when it runs two times.
 
-Produce a structured report:
+**Hidden dependencies (principle 4)**
+
+- Find out if a person or an LLM can understand a file from that file and its imports alone.
+- Look for global values, hidden configuration, and conventions that a reader must already know.
+- Find out if the code documents the environment variables where it uses them.
+- Find out if the code moves state explicitly, through properties or arguments. State from closures or globals is a defect.
+- Do not report standard framework conventions, such as Next.js routing or Rails conventions. These are acceptable. Report only custom behavior that a reader cannot see.
+
+**File navigability (principle 5)**
+
+- Examine the size and the name of each new file and each changed file. An LLM must find the correct code in 1 or 2 tool calls.
+- Find out if Grep on a function name finds that function in one file.
+- Report each file where a reader cannot understand line 400 without lines 50 to 150. This condition is entanglement.
+- Report very large files that a person can divide along domain boundaries. Also report too many small files, because they make navigation difficult. Both extremes are bad.
+- **Report navigability as a cost defect, not a correctness defect.** A controlled minimal-pair experiment used 660 trials. It compared clean repositories with degraded repositories that had the same architecture and the same behavior. Cleanliness did **not** change the pass rate of the agent. Cleanliness did decrease token use by 7% to 8%, and decreased file revisits by 34%. For the evidence, read `references/research.md`. Therefore, do not increase the risk level for navigability alone. Give the finding in its true units: this costs tokens and repeated reads in each future session. Do not say that it causes a defect. Increase the risk level only when entanglement hides a contract.
+
+**Adapter boundaries (principle 6)**
+
+- Find out if the code reaches external systems through thin adapter wrappers with stable interfaces. External systems include databases, APIs, cloud services, and LLM providers.
+- Find out if a change behind a boundary needs a change in the adapter file only. If the consumers also need changes, the boundary is not sufficient.
+- Report direct database calls, raw HTTP responses, and vendor-specific code in more than one file. This code belongs in an adapter.
+- Do not report stable libraries that nobody will replace, such as lodash or dayjs. An adapter is useful only at a boundary that can change.
+
+**Documentation indexability (principles 8 and 9)**
+
+- Find out if an LLM can find the information in O(1) time, not O(n) time.
+- Find out if the documents have clear headings. LLMs search by heading.
+- Report documentation that needs 5 or more files to follow a call chain.
+- For each new module or feature, find out if the documentation is sufficient. An LLM in a new session must understand the purpose without a read of all the implementation.
+
+**Context files (CLAUDE.md, AGENTS.md, Cursor rules)**
+
+Many people believe that a larger and better organized context file makes an agent better. The evidence does not support this belief.
+
+One study used SWE-bench tasks and also repositories with context files that developers wrote. Context files did **not** generally improve the task success rate. Context files did increase the inference cost by **more than 20%**. Agents followed the instructions well. But *repository overviews did not help*, although most guidance recommends them.
+
+A second study was a factorial experiment over 1,650 Claude Code sessions. It manipulated four variables: file size, instruction position, file architecture, and contradictions between adjacent files. None of the four variables had a measurable effect on adherence. For the evidence, read `references/research.md`.
+
+When the diff touches a context file, do these checks:
+
+- **Report overview prose and architecture tours as unnecessary cost.** Each session pays this cost, and the evidence shows no benefit. Remove this prose, or move it to documents that the agent can Grep when it needs them.
+- **Keep the instructions that an agent cannot infer.** Examples: the test command for this repository, the migration procedure, "never edit `generated/`", and a house idiom that is different from the framework default. This content has a measured value.
+- **Do not report the file structure, the order, or the size.** These variables had no measurable effect. Report only the total cost and the ratio of overview text to instructions.
+- **Do report contradictions with the code.** Adjacent-file conflicts have no measured effect on adherence. But an agent follows an incorrect instruction exactly and with confidence.
+- If an LLM generated a context file in this diff, say so, and ask for a review by a person. Auto-generated context files gave *worse* results than no context file in the SWE-bench setting.
+
+**Instruction decay in one session**
+
+The largest measured effect in the factorial study was not structural. Adherence to a repository convention decreases by approximately 5.6% in odds for each additional function that the agent generates in one session. If this diff is one long generation run, expect the conventions to decay near the end. Examine the files that changed last more carefully than the files that changed first. Recommend shorter runs. Do not recommend a new context file.
+
+### Step 9: Downstream agent-buildability
+
+This code is not complete when it ships. It is complete when the next agent session can extend it.
+
+A controlled study used the CodeThread framework, four frontier agents, and four repository-level benchmarks. Agents completed tasks up to **13.1% less frequently when they built on agent-written code than on code that a person wrote**. Usual maintainability metrics did not explain this difference. Two signals did explain it: **differences in input validation and in error handling**. Downstream code size also explained part of it. For the evidence, read `references/research.md`.
+
+Therefore, look for validation differences and error handling differences between the new code and the code near it. A linter cannot find these differences.
+
+- Find out if the new code validates its inputs in the same way as the module around it. Report code that trusts its callers where the adjacent code does not. Also report defensive checks that the conventions put at the boundary instead.
+- Find out if the new code handles errors in the style of the codebase. Look for the same error types, the same propagation direction, and the same log contract. Report a second convention next to the first one.
+- Ask this question: are there now two answers to "what happens with bad input here?" Two conventions degrade the next session. The agent must guess which one applies.
+- Find out if the change is larger than the task needs. Extra downstream code size is an independent predictor of failure.
+
+**Report two validation conventions or two error handling conventions in one module as HIGH.** Say which convention you think is the correct one.
+
+### Step 10: Agent surface and secrets
+
+AI-assisted development has a threat surface that usual code review does not examine. These artifacts are not source code. They are content that an agent reads and obeys.
+
+This step covers only the agent-specific part. The `/security-review` command covers general security. The `/supply-chain-check` command covers dependencies.
+
+**Secrets in the code**
+
+AI-assisted commits release secrets at a rate of approximately **3.2%, against a baseline of 1.5%** across public GitHub commits. For the evidence, read `references/research.md`.
+
+Examine the diff, not only the source files. Fixtures, test files, `.env.example`, snapshot files, and documents can all contain secrets.
+
+```bash
+# Use the SAME diff range that you set in Step 1. On a branch, add main...HEAD.
+git diff -U0 | grep -E '^\+[^+]' | grep -Ei '(api[_-]?key|secret|passwd|password|token|bearer|private[_-]?key|BEGIN [A-Z ]*PRIVATE KEY|aws_(access|secret)|sk-[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,})' | head -40
+```
+
+Read each result to confirm it. Placeholders and variable names are not secrets.
+
+**Report a real secret in the diff as CRITICAL.** Also say that a later commit does not correct the problem. The value stays in the history. A person must change the secret.
+
+**Agent configuration in the diff**
+
+These files give capability to an agent. Examine them with the same care as source code, not as documentation.
+
+- `.mcp.json`, `.claude/settings.json`, `.claude/settings.local.json` — a new MCP server is a new dependency with the authority of the agent. Ask who publishes it. Ask what it can reach.
+- Hook definitions such as `hooks.json`, `PreToolUse` entries, and `PostToolUse` entries — these run shell commands at each applicable tool call.
+- New or changed permission lists — find out if the diff makes `allow` wider than necessary. A wider `Bash(*)` permission is a finding.
+- `.claude/skills/**`, `.claude/agents/**`, `CLAUDE.md`, `AGENTS.md` — an agent obeys these instructions.
+- CI workflows that run an agent, such as `.github/workflows/**` — find out what starts them and what secrets they mount.
+
+**Paths for untrusted content**
+
+Three conditions together cause a serious risk: access to private data, exposure to untrusted content, and a channel to the outside. Find out if this change adds the second condition.
+
+- Find out if the change causes an agent to read text that an attacker can control, and then to act on that text. Examples: issue bodies, pull request titles, commit messages, review comments, dependency README files, web pages, records that users supply, and output from a third-party API.
+- Find out if the code puts that content into a prompt, or gives it to an agent runtime. The content must have a boundary and a label that mark it as untrusted data.
+- If the agent workflow can also write, name the path for data theft in the report. Write operations include a new pull request, a new comment, and an API call.
+
+**Report a new path for untrusted content into an agent that can also write as CRITICAL.**
+
+### Step 11: Output
+
+Give a report with this structure:
 
 ```
 ## QA Check Report
 
 ### Risk level: [LOW / MEDIUM / HIGH / CRITICAL]
-(state any escalations applied: no spec, unhealthy files)
+(name each increase that you applied: no specification, unhealthy files)
 
-### Spec discipline
-- Written spec/acceptance criteria found: [yes/no/N-A — link or path]
+### Specification discipline
+- Written specification or acceptance criteria found: [yes / no / not applicable — link or path]
 
 ### Complexity (Quality Paradox)
-- Files touched: N | Decision points modified: N | Cross-domain: yes/no
-- Rework signals: [any files re-touched within 14 days]
-- Unhealthy files touched: [large/high-churn files in the diff]
-- Sustainable velocity concern: [yes/no — new code without proportional QA]
+- Files touched: N | Decision points changed: N | More than one domain: yes/no
+- Rework signals: [files that changed again in 14 days]
+- Unhealthy files touched: [large files or high-churn files in the diff]
+- Sustainable velocity problem: [yes/no — new code without QA in proportion]
 
 ### Test integrity
-- [Deleted/skipped/weakened existing tests, with justification status]
-- [New tests that mirror implementation instead of asserting behavior]
+- [Deleted, skipped, or weak existing tests, and the reason status]
+- [New tests that copy the implementation instead of examining behavior]
+- [Error branches with no test that enters them]
+- [Tests that are not hermetic: file system, network, clock, random values, unordered collections]
 
 ### Dependency provenance
-- [Each new dependency: exists / age / maintainer / pinned / name-proximity verdict]
+- [For each new dependency: existence, age, maintainer, pinning, name proximity]
 
 ### Validation gaps (Quality Paradox)
-- [Missing tests or coverage gaps; functions returning null instead of throwing]
-- [Missing boundary validations; vague error messages]
+- [Missing tests and coverage gaps; functions that return null instead of an error]
+- [Missing boundary checks; error messages that are not specific]
 
-### AI-specific concerns (Quality Paradox)
-- [Hallucinated APIs, duplicated logic, semantic issues, silent failures]
-- [AI slop: comment pollution, speculative abstraction, dead code]
+### AI-specific problems (Quality Paradox)
+- [Invented APIs, duplicate logic, semantic errors, silent failures]
+- [AI slop: too many comments, unnecessary abstraction, dead code]
 
 ### Contract compliance
-- [Contract/type/schema mismatches; API changes without contract updates; modules lacking contracts]
+- [Contract, type, or schema differences; API changes with no contract change; modules with no contract]
 
 ### Architecture violations
-- [Idempotency violations; implicit dependencies; missing adapter boundaries]
-- [File navigability issues; documentation gaps]
+- [Operations that are not idempotent; hidden dependencies; missing adapter boundaries]
+- [File navigability — give this as token cost and repeated reads, not as correctness risk]
+- [Context file findings: unnecessary overview text, incorrect instructions, auto-generated content]
+
+### Agent-buildability
+- [Validation or error handling that is different from the adjacent code; which convention is correct]
+- [Code size larger than the task needs]
+
+### Agent surface and secrets
+- [Secrets in the code — say that a person must change them]
+- [MCP servers, hooks, wider permissions, and changes to skills, agents, or workflows]
+- [New paths for untrusted content, and the write channel that goes with them]
 
 ### Recommended actions
-1. [Specific, actionable items to address before merging]
+1. [Specific actions to complete before the merge]
 ```
 
-**After producing the report**, record that the check ran (this unblocks the push gate in repos with a `.qa-check-required` file):
+**After you give the report**, record that the check ran. This unblocks the push gate in repositories that have a `.qa-check-required` file:
 
 ```bash
 printf '%s\n%s\n' "$(git rev-parse HEAD)" "$(date +%s)" > "$(git rev-parse --git-dir)/qa-check-ok"
@@ -253,21 +417,43 @@ printf '%s\n%s\n' "$(git rev-parse HEAD)" "$(date +%s)" > "$(git rev-parse --git
 
 ### Risk level criteria
 
-- **LOW**: < 3 files, tests exist, no rework signals, no cross-domain changes, no architecture violations
-- **MEDIUM**: 3-8 files, or minor test gaps, or one rework signal, or minor architecture violations (missing docs, slight navigability issues)
-- **HIGH**: 8+ files, or multiple test gaps, or cross-domain without integration tests, or rework signals on 2+ files, or significant architecture violations (missing contracts at boundaries, non-idempotent operations, implicit dependencies)
-- **CRITICAL**: No tests for new code paths, or hallucinated APIs detected, or unjustified weakening/deletion of existing tests, or a new dependency that fails provenance checks, or rework rate > 40% on touched files, or fundamental architecture violations (no adapter boundaries on external systems, entangled megafiles with no contracts)
+- **LOW**: Fewer than 3 files, tests exist, no rework signals, one domain only, and no architecture violations
+- **MEDIUM**: 3 to 8 files, or small test gaps, or one rework signal, or small architecture violations such as missing documents or minor navigability problems
+- **HIGH**: any one of these conditions:
+  - 8 or more files
+  - More than one test gap
+  - More than one domain, with no integration tests
+  - Rework signals in 2 or more files
+  - Error branches with no test
+  - Two validation conventions in one module
+  - A large architecture violation. These are missing contracts at boundaries, operations that are not idempotent, and hidden dependencies.
+- **CRITICAL**: any one of these conditions:
+  - No tests for new code paths
+  - Invented APIs
+  - Weak or deleted existing tests, with no reason
+  - A new dependency that fails the provenance check
+  - A real secret in the diff
+  - A new path for untrusted content into an agent that can also write
+  - A rework rate above 40%
+  - A basic architecture violation. These are no adapter boundaries on external systems, and entangled very large files with no contracts.
 
-**Escalation rules** (applied after the base level): raise one notch if a feature-sized diff has no written spec (Step 2), or if the diff lands in unhealthy files (Step 3). State applied escalations in the report.
+Navigability, context file size, and documentation gaps are cost findings. Report them. Do not increase the risk level for these findings alone.
+
+**Rules to increase the level** (apply after the base level): Increase the level by one step if a feature-size diff has no written specification (Step 2). Increase the level by one step if the diff touches unhealthy files (Step 3). Name each increase in the report.
 
 ## Important notes
 
-- Be specific. "Needs more tests" is useless. "The new `calculateDiscount()` function at pricing.js:47 has no test coverage for the edge case where discount > price" is actionable.
-- Don't flag style issues. This isn't a linter. Focus on defects, rework risk, validation gaps, and architecture violations.
-- Model upgrades do NOT reduce the need for this review. Security pass rates for generated code have stayed flat (~55%) across two years of model releases (Veracode Spring 2026).
-- qa-check is an LLM review and therefore non-deterministic — two runs on the same diff can differ. It complements, never replaces, deterministic gates: linters, static analysis, type checks, coverage diffs (Entelligence 2026).
-- Check git history for rework patterns. A file that's been touched 4 times in 2 weeks for the same feature is a red flag regardless of what the current diff looks like.
-- Architecture violations are quality violations on a longer timeline. A missing contract today becomes a hallucinated data shape tomorrow. A non-idempotent script becomes a state corruption spiral next session.
-- The goal is to catch things before they become rework. Every defect caught here saves 18x the cost of finding it in production (Mennillo 2026, testing ROI).
-- Don't flag standard framework conventions as "implicit magic." Next.js routing, Rails conventions, Django ORM patterns — the LLM knows these from training data.
-- Adapter boundaries are only worth flagging at real boundaries where the other side might change. Don't suggest wrapping stable utility libraries.
+- Be specific. "Needs more tests" does not help. "The new `calculateDiscount()` function at pricing.js:47 has no test for the case where the discount is more than the price" is a usable finding.
+- Do not report style problems. This skill is not a linter. Examine defects, rework risk, validation gaps, and architecture violations.
+- A newer model does not remove the need for this review. Security pass rates for generated code stayed at approximately 55% across two years of model releases (Veracode, spring 2026).
+- This skill is an LLM review, so it is not deterministic. Two runs on the same diff can give different results. This skill is an addition to deterministic gates. It does not replace linters, static analysis, type checks, or coverage diffs (Entelligence 2026).
+- Examine the git history for rework patterns. A file with 4 changes in 2 weeks for the same feature is a risk, whatever the current diff shows.
+- Architecture violations are quality violations on a longer timeline. A missing contract today causes an incorrect data shape tomorrow. A script that is not idempotent causes corrupt state in the next session.
+- Find problems before they become rework. Each defect that you find here saves 18 times the cost of a defect that reaches production (Mennillo 2026, testing ROI).
+- Do not report standard framework conventions as hidden behavior. An LLM knows Next.js routing, Rails conventions, and Django ORM patterns from its training data.
+- Report adapter boundaries only at real boundaries that can change. Do not recommend a wrapper for a stable utility library.
+- Divide cost findings from correctness findings, and say which is which. Clean code makes agents less costly and more efficient. But clean code did not make agents more correct in controlled trials. If you overstate this result, the review loses its authority.
+- Do not give rules for the structure of a context file. Size, position, and internal architecture had no measured effect on adherence. The type of content did have an effect. Instructions that an agent cannot infer are worth their cost. Repository overviews are not.
+- Change the depth of the review for the type of task. Reported gains are large for simple new work and much smaller for complex legacy code. A diff in a mature subsystem needs more examination for each line, not less. (The frequently quoted figures of 35% to 40% against 10% come from secondary coverage of DORA 2026. The direction is correct. The numbers are unverified.)
+- AI is an amplifier, not a correction (DORA 2026). The largest returns come from the quality of the system below the tools: the platform, clear workflows, and team alignment. Findings about repeated structural problems are more important than any one diff.
+- Do not use merge results or rejection results as evidence of agent quality. In a study of 9,799 pull requests that people reviewed, only 35.7% of the rejections showed a clear agent failure. Workflow limits caused 31.2%, and 33.1% had no visible reason. Of the merged pull requests, 15.4% needed reviewer feedback or direct commits, and 5.5% showed no interaction at all. A merged agent pull request is not a reviewed pull request.
