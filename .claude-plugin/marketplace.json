@@ -5,14 +5,14 @@
     "email": "opensource@codelitt.com"
   },
   "metadata": {
-    "version": "1.2.0",
-    "description": "Claude Code skills for AI-native development: quality assurance, supply chain security, and architecture patterns"
+    "version": "1.3.0",
+    "description": "Claude Code skills for AI-native development: quality assurance, supply chain security, the pull request loop, and architecture patterns"
   },
   "plugins": [
     {
       "name": "qa-check",
-      "version": "3.1.0",
-      "description": "Review code changes for AI Quality Paradox violations and AI-native architecture anti-patterns. Complements Claude Code's built-in /code-review: /code-review hunts correctness bugs; qa-check owns AI-specific quality decay and architecture, including rework risk, test integrity (weakened or gamed tests), dependency provenance, spec discipline, validation gaps, and maintainability smells. Ships a deterministic push gate (PreToolUse hook, no LLM calls): repos with a .qa-check-required file block git push until /qa-check has run.",
+      "version": "4.0.0",
+      "description": "Examine code changes for AI Quality Paradox problems, AI-native architecture problems, and agent-buildability. This plugin is an addition to the /code-review command in Claude Code. The /code-review command finds correctness defects. This plugin finds AI-specific quality decay and architecture defects: rework risk, test integrity (weak tests, error paths with no test, tests that use external resources), dependency source, specification discipline, secrets in the code, agent configuration files, prompt injection paths, missing data checks, and maintainability problems. It also supplies a deterministic push gate as a PreToolUse hook, with no LLM calls: in a repository that has a .qa-check-required file, git push stops until /qa-check runs.",
       "author": {
         "name": "Codelitt",
         "email": "opensource@codelitt.com",
@@ -23,13 +23,24 @@
     {
       "name": "supply-chain-check",
       "version": "1.1.0",
-      "description": "Single-command supply chain security audit. Queries live advisory sources (npm audit, OSV.dev, GitHub Advisory Database) and scans for dangerous version ranges, lock file issues, typosquatting, slopsquatting and hallucinated dependencies, and local IOC artifacts. Wraps npm audit with active threat heuristics.",
+      "description": "Single-command supply chain security audit. Scans for compromised packages, dangerous version ranges, lock file issues, CVEs, typosquatting, slopsquatting (hallucinated dependencies), and local IOC artifacts. Wraps npm audit and live advisory sources (OSV.dev, GitHub Advisory Database) with active threat heuristics.",
       "author": {
         "name": "Codelitt",
         "email": "opensource@codelitt.com",
         "url": "https://github.com/codelittinc"
       },
       "source": "./plugins/supply-chain-check"
+    },
+    {
+      "name": "pr-workflow",
+      "version": "1.0.0",
+      "description": "Five skills that make one pull request loop: write the pull request, review it, answer the review, and record the work that you defer. /pr-create writes a title and a description from the branch diff. /pr-create-reviewed opens a draft, examines the diff with subagents that have no session context, and marks the pull request ready after you triage the findings. /review-pr examines a pull request and writes the feedback in Simplified Technical English (ASD-STE100); it prints the review for your own pull request and posts comments on a pull request from a different author. /pr-address-comments collects every unresolved comment, triages each one with you, applies the fixes, and answers each thread. /issue-create files the work that you defer. The skills share two rules: the description states the end state and does not narrate the session, and the author decides each finding.",
+      "author": {
+        "name": "Codelitt",
+        "email": "opensource@codelitt.com",
+        "url": "https://github.com/codelittinc"
+      },
+      "source": "./plugins/pr-workflow"
     }
   ]
 }
