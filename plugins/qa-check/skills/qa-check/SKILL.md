@@ -1,6 +1,6 @@
 ---
 name: qa-check
-version: 4.0.0
+version: 4.1.0
 description: |
   Examine code changes for AI Quality Paradox problems and for AI-native
   architecture problems. This skill is an addition to the /code-review command
@@ -61,6 +61,8 @@ AI-generated code decreases validation capacity 12 times more quickly than code 
 ## Process
 
 ### Step 1: Find what changed
+
+Do all steps in the checkout that contains the change. If the change is in a git worktree, that checkout is the worktree, not the main checkout: run each command from the worktree path, or use `git -C <worktree path>`. Run `git rev-parse --show-toplevel` and `git branch --show-current` first, and make sure that they show the checkout and branch of the change.
 
 Run `git diff --stat` and `git diff` to find the size of the change. On a branch, run `git diff main...HEAD`. Record these items:
 
@@ -359,6 +361,8 @@ Give a report with this structure:
 ```
 ## QA Check Report
 
+Checked: [branch] at [short HEAD SHA]
+
 ### Risk level: [LOW / MEDIUM / HIGH / CRITICAL]
 (name each increase that you applied: no specification, unhealthy files)
 
@@ -409,10 +413,10 @@ Give a report with this structure:
 1. [Specific actions to complete before the merge]
 ```
 
-**After you give the report**, record that the check ran. This unblocks the push gate in repositories that have a `.qa-check-required` file:
+**After you give the report**, record that the check ran. This unblocks the push gate in repositories that have a `.qa-check-required` file. Run this command in the same checkout as Step 1. It writes the marker into that checkout, in a `.qa-check/` directory that ignores itself in git:
 
 ```bash
-printf '%s\n%s\n' "$(git rev-parse HEAD)" "$(date +%s)" > "$(git rev-parse --git-dir)/qa-check-ok"
+top=$(git rev-parse --show-toplevel) && mkdir -p "$top/.qa-check" && printf '*\n' > "$top/.qa-check/.gitignore" && printf '%s\n%s\n' "$(git rev-parse HEAD)" "$(date +%s)" > "$top/.qa-check/ok"
 ```
 
 ### Risk level criteria

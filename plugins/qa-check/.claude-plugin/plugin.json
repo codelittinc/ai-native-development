@@ -1,6 +1,6 @@
 {
   "name": "qa-check",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Examine code changes for AI Quality Paradox problems, AI-native architecture problems, and agent-buildability. This plugin is an addition to the /code-review command in Claude Code. The /code-review command finds correctness defects. This plugin finds AI-specific quality decay and architecture defects: rework risk, test integrity (weak tests, error paths with no test, tests that use external resources), dependency source, specification discipline, secrets in the code, agent configuration files, prompt injection paths, missing data checks, and maintainability problems. It also supplies a deterministic push gate as a PreToolUse hook, with no LLM calls: in a repository that has a .qa-check-required file, git push stops until /qa-check runs.",
   "author": {
     "name": "Codelitt",
