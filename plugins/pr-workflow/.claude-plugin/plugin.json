@@ -1,0 +1,10 @@
+{
+  "name": "pr-workflow",
+  "version": "1.0.0",
+  "description": "Five skills that make one pull request loop: write the pull request, review it, answer the review, and record the work that you defer. /pr-create writes a title and a description from the branch diff. /pr-create-reviewed opens a draft, examines the diff with subagents that have no session context, and marks the pull request ready after you triage the findings. /review-pr examines a pull request and writes the feedback in Simplified Technical English (ASD-STE100); it prints the review for your own pull request and posts comments on a pull request from a different author. /pr-address-comments collects every unresolved comment, triages each one with you, applies the fixes, and answers each thread. /issue-create files the work that you defer. The skills share two rules: the description states the end state and does not narrate the session, and the author decides each finding.",
+  "author": {
+    "name": "Codelitt",
+    "email": "opensource@codelitt.com",
+    "url": "https://github.com/codelittinc"
+  }
+}
