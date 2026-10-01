@@ -39,6 +39,16 @@ The original claude-code-action CI recipe was rejected — headless Claude bills
 - [ ] Drop `.qa-check-required` into the repos that should be gated (Cody picks which).
 - [ ] Add the free qa-report-present workflow to those repos' CI.
 
+## Phase 4 — Worktree-aware push gate (qa-check 4.1.0, 2026-09-28)
+
+The push gate misfired in git worktrees and forced routine `QA_CHECK_SKIP=1` overrides:
+
+- [x] Resolve the repo from the hook input's `cwd`, a leading `cd <dir>`, or `git -C <dir>`. `CLAUDE_PROJECT_DIR` stays on the main checkout after a session enters a worktree, so the old gate compared against another branch's HEAD.
+- [x] Writer and reader use one marker path: `<checkout root>/.qa-check/ok` (self-ignoring directory). The old reader used the main `.git/`, the writer used `.git/worktrees/<name>/`, and worktree isolation blocks writes under the shared `.git` either way.
+- [x] Commands are parsed by shell segment to follow `cd`, so `echo "git push"` in a string no longer trips the gate.
+- [x] Hook rewritten in Python (`hooks/qa-gate.py`) with `hooks/test_qa_gate.py`. The tests stamp the marker with the command from SKILL.md, so writer and reader cannot drift.
+- [x] Version drift fixed: marketplace.json listed qa-check 3.1.0 while plugin.json and SKILL.md said 4.0.0; all three now say 4.1.0.
+
 ## Review (2026-07-02)
 
 Implemented via an orchestrated workflow: 5 work items, each a builder→checker loop (adversarial checker, max 3 iterations). All 5 passed — 4 on the first iteration, supply-chain-check on the second. 12 agents total, zero errors.

@@ -1,5 +1,5 @@
 {
-  "description": "qa-check push gate — blocks git push in opted-in repos (.qa-check-required) until /qa-check has run against current HEAD. Deterministic, no LLM calls.",
+  "description": "qa-check push gate — blocks git push in opted-in repos (.qa-check-required) until /qa-check has run against current HEAD of the checkout (worktree-aware). Deterministic, no LLM calls.",
   "hooks": {
     "PreToolUse": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/qa-gate.sh",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/qa-gate.py\"",
             "timeout": 10
           }
         ]

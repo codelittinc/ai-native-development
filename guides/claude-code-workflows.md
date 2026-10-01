@@ -157,7 +157,8 @@ The stack, in order of value:
 **1. The push gate (ships with the qa-check plugin).** Installing the qa-check plugin installs a PreToolUse hook that intercepts `git push` from any Claude Code session. In repos that opt in, the push is blocked until `/qa-check` has run against the current HEAD (or within the last 30 minutes — covering the normal check → fix → commit → push flow). The gate is a deterministic shell script: zero model calls, zero API cost.
 
 - Opt a repo in: `touch .qa-check-required` at the repo root (commit it).
-- `/qa-check` writes the freshness marker (`.git/qa-check-ok`) automatically when it completes.
+- `/qa-check` writes the freshness marker automatically when it completes: `.qa-check/ok` at the root of the checkout it reviewed, in a directory that git-ignores itself.
+- Worktree-aware: the gate checks the checkout the push runs in (the hook's working directory, a leading `cd <dir> &&`, or `git -C <dir>`), so each git worktree carries its own marker. Run `/qa-check` inside the worktree.
 - Deliberate override, one push: `QA_CHECK_SKIP=1 git push`.
 
 Because the whole team writes code through Claude Code, gating the session's `git push` IS gating the PR — at the moment the work happens, on subscription, instead of after the fact on API credits.
